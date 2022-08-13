@@ -1,0 +1,221 @@
+<head>
+    <meta charset="UTF-8">
+    <title>avalon</title>
+</head>
+<style>
+    div{width:100%;text-align:center}
+    input{font-size:50px;}
+    .box{width:10%;float:left}
+    p{font-size:50px}
+    li{font-size:50px;}
+    .btn{height:100px;width:150px;}
+</style>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<link rel="stylesheet" href="css/bootstrap.min.css" />
+<link rel="stylesheet" href="css/bootstrap/dist/css/bootstrap.css" />
+<script src="./script/jquery.min.js" type="text/javascript"></script>
+<script type="text/javascript" src="./script/jquery-cookie/jquery.cookie.js"></script>
+
+<body style="padding:5%;height: 100%;">
+<div id="first">
+<font size="30px">昵称</font> <input id="name" style="width:450px;height:50px;font-size:25px" type="text"/>
+<input id="enter" onclick="enter_room()" style="font-size:25px;" type="button" class="btn btn-success btn-lg" value="进入房间"><br>
+</div>
+<div id="self">
+</div>
+<ol id="list">
+</ol>
+<div id="host">
+</div>
+<div id="role">
+</div>
+<div id="info">
+</div>
+<div id="car_mem"></div>
+<div id="car">
+    <ol id="member"></ol>
+    <input type="button" style="font-size:25px;" class="btn btn-success btn-lg" value="确认发车" onclick="go_car()" />
+</div>
+<div id="vote1">
+    <input type="button" style="font-size:25px;" class="btn btn-info btn-lg" value="同意" onclick="v1_agree()" />
+    <input type="button" style="font-size:25px;" class="btn btn-danger btn-lg" value="反对" onclick="v1_reject()" />
+</div>
+<div id="vote2">
+    <input type="button" style="font-size:25px;" class="btn btn-info btn-lg" value="成功" onclick="v2_agree()" />
+    <input type="button" style="font-size:25px;" class="btn btn-danger btn-lg" value="失败" onclick="v2_reject()" />
+</div>
+<p>投票结果：</p>
+<ol style="float:left" id="res1"></ol>
+<ul id="res2" style="left:50px;position:relative"></ul>
+<br><br>
+<input class="tools btn btn-warning btn-lg" type="button" style="font-size:25px;" value="重开 " onclick="remake()" />
+<input type="button" style="font-size:25px;" class="btn btn-danger btn-lg" value="退出" onclick="exit()" />
+</body>
+
+<script type="text/javascript">
+var ws = new WebSocket("ws://*ip:*port")
+$(function(){$("#car").hide();$("#vote1").hide();$("#vote2").hide();$(".tools").hide()})
+$(function(){
+    if($.cookie("ava_name")){
+        document.getElementById("name").value = $.cookie("ava_name")
+    }
+})
+function enter_room(){
+    $("#first").hide()
+    ws.send("!"+document.getElementById("name").value)
+    $("#self").html("<p>昵称:"+document.getElementById("name").value+"</p>")
+}
+ws.onmessage = function(e) {
+    if(e.data=="host"){
+        str = "<font size='25px'>您是房主，可以选择开始游戏&nbsp;&nbsp;</font><input style='font-size:25px' id=\"start\" onclick=\"start_game()\" " + 
+        "type=\"button\" class=\"btn btn-success btn-sm\" value='开始'><br>"
+        $("#host").html(str)
+        $(".tools").show()
+    }else if(e.data.substr(0,1)=="#"){
+        $("#role").html("<p>您的身份是"+e.data.split(";")[0]+"</p>")
+        if(e.data.substr(1,1)!="@"){
+            var visual = e.data.split(";")[1].split("-")
+            for(var i in visual){
+                v = visual[i]
+                var p = v.split(",")[0]
+                var u = parseInt(v.split(",")[1])-1
+
+                if(p=='n'){
+                    $("#u"+u).css("color", "#DC143C")
+                }
+                if(p=='u'){
+                    $("#u"+u).css("color", "#F4A460")
+                }
+                if(p=='m'){
+                    $("#u"+u).css("color", "#DC143C")
+                    document.getElementById("u"+u).innerHTML += "-莫德雷德" 
+                }
+            }
+        }
+    }else if(e.data=="@owner"){
+        $("#car").show()
+    }else if(e.data.substr(0,4)=="@car"){
+        $("#info").html("<p>当前是"+e.data.substr(4)+"号玩家开车</p>")
+    }else if(e.data.substr(0,1)=="%"){
+        var ml = ""
+        var arr = e.data.substr(0).split("%")
+        for(var i in arr){
+            if(arr[i]!=""){
+                ml += parseInt(arr[i])+1 + ","
+            }
+        }
+        $("#car_mem").html("<p>车主选择了"+ml+"号玩家</p>")
+    }else if(e.data=="vote1"){
+        $("#vote1").show()
+    }else if(e.data.substr(0,3)=="^v1"){
+        var res = e.data.substr(3).split(";").slice(0,-1)
+        var ag_list = ""
+        var rj_list = ""
+        for(var i in res){
+            if(res[i].split(",")[1] == "agree"){
+                ag_list += res[i].split(",")[0]+" "
+            }else{
+                rj_list += res[i].split(",")[0]+" "
+            }
+        }
+        var h = document.getElementById("res1").innerHTML
+        $("#res1").html(h+"<li><font color=#1E90FF>"+ag_list+"</font>"+"<font color=#FF8C00>"+rj_list+"</font></li>")
+    }else if(e.data=="vote2"){
+        $("#vote2").show()
+    }else if(e.data.substr(0,3)=="^v2"){
+        var res = e.data.substr(4).split(";")
+        var ag = res[0]
+        var rj = res[1]
+        // for(var i in res){
+        //     if(res[i].split(",")[1] == "agree"){
+        //         ag += 1
+        //     }else{
+        //         rj += 1
+        //     }
+        // }
+        var h = document.getElementById("res2").innerHTML
+        $("#res2").html(h+"<li><font color=#1E90FF>"+ag+"张好票</font>"+"<font color=#DC143C>"+rj+"张坏票</font></li>")
+    }else if(e.data=="*"){
+        var h = document.getElementById("res2").innerHTML
+        $("#res2").html(h+"<li><font color=	#A0522D>发车不成功</font></li>")
+    }else if(e.data=="remake^"){
+        $("#car").hide();$("#vote1").hide();$("#vote2").hide();
+        for(var i = 0; i<$("#list").find("li").length; i++){
+            $("#list").find("li")[i].innerHTML = $("#list").find("li")[i].innerHTML.split("-")[0]
+        }
+        $("#list").find("li").css("color","black")
+        $("#car").hide()
+        $("#res1").html("")
+        $("#res2").html("")
+        //$.cookie("ava_name",'', { expires: -1 });
+    }else if(e.data=="exit^"){
+        setTimeout("location.reload()", 500);
+    }else{
+        users = e.data.split(";").slice(0,-1)
+        items = ""
+        checks = ""
+        for(var i in users){
+            items += "<li id=u"+users[i].split(",")[0]+">"+users[i].split(",")[1]+"</li>"
+            checks += '<li><input type="checkbox" style="zoom:450%;margin:0 0" class="box" id=c'+users[i].split(",")[0]+'></li>' 
+        }
+        $("#list").html(items);
+        $("#car").hide()
+        $("#member").html(checks)
+    }
+};
+function start_game(){
+    ws.send("start")
+    $("#host").hide()
+    $("#car_mem").show()
+};
+function go_car(){
+    if(!$("#car").is(":hidden")){
+        var mem = "^!"
+        for(var i = 0; i<$(".box").length; i++){
+            var checkbox = $(".box")[i];
+            if(checkbox.checked){
+                mem += checkbox.id.substr(1)+"%"
+            }
+        }
+        ws.send(mem)
+        $("#car").hide()
+        $(".box").prop("checked", false)
+    }
+};
+function v1_agree(){
+    ws.send("v1agree")
+    $("#vote1").hide()
+};
+function v1_reject(){
+    ws.send("v1reject")
+    $("#vote1").hide()
+};
+function v2_agree(){
+    ws.send("v2agree")
+    $("#vote2").hide()
+};
+function v2_reject(){
+    ws.send("v2reject")
+    $("#vote2").hide()
+};
+function remake(){
+    ws.send("remake")
+    ws.send("start")
+}
+function exit(){
+    ws.send("exit")
+    //$.cookie("ava_name",'', { expires: -1 });
+}
+setInterval(function(){
+    if(!$("#car").is(":hidden")){
+        var mem = "%"
+        for(var i = 0; i<$(".box").length; i++){
+            var checkbox = $(".box")[i];
+            if(checkbox.checked){
+                mem += checkbox.id.substr(1)+"%"
+            }
+        }
+        ws.send(mem)
+    }
+},100);
+</script>
